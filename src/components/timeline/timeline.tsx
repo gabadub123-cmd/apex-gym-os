@@ -8,9 +8,10 @@ import type { TimelineEvent, TimelineEventType } from "@/lib/types/database";
 
 interface TimelineProps {
   events: TimelineEvent[];
+  clientId?: string;
 }
 
-export function Timeline({ events }: TimelineProps) {
+export function Timeline({ events, clientId }: TimelineProps) {
   const [activeFilters, setActiveFilters] = useState<Set<TimelineEventType>>(
     new Set()
   );
@@ -36,7 +37,7 @@ export function Timeline({ events }: TimelineProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h3 className="text-lg font-semibold">Timeline</h3>
-        <AddEventDialog />
+        {clientId && <AddEventDialog clientId={clientId} />}
       </div>
 
       <TimelineFilter active={activeFilters} onToggle={handleToggle} />

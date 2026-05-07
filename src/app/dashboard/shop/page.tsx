@@ -1,31 +1,31 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Users, Trophy } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { ShoppingBag, FileText, CreditCard } from "lucide-react";
 
-export default function CommunityPage() {
+export default function ShopPage() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Community</h1>
+        <h1 className="text-2xl font-bold">Shop & Billing</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Connect with your clients and build your community.
+          Manage your products, invoices, and payments.
         </p>
       </div>
 
       <div className="grid gap-4">
         <FeaturePreview
-          icon={MessageSquare}
-          title="Group Chat"
-          description="Create chat channels for client groups, training partners, and competition prep teams."
+          icon={ShoppingBag}
+          title="Product Catalog"
+          description="Set up coaching packages, meal plans, and training programs for sale."
         />
         <FeaturePreview
-          icon={Trophy}
-          title="Challenges"
-          description="Set up weekly challenges — step competitions, consistency streaks, and milestone races."
+          icon={FileText}
+          title="Invoicing"
+          description="Generate and send PDF invoices to clients automatically."
         />
         <FeaturePreview
-          icon={Users}
-          title="Client Feed"
-          description="A shared feed where clients can post progress updates, ask questions, and support each other."
+          icon={CreditCard}
+          title="Payments"
+          description="Accept payments via Stripe — subscriptions and one-time purchases."
         />
       </div>
     </div>
@@ -37,7 +37,7 @@ function FeaturePreview({
   title,
   description,
 }: {
-  icon: typeof MessageSquare;
+  icon: typeof ShoppingBag;
   title: string;
   description: string;
 }) {
