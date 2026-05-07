@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { ClientProfileHeader } from "@/components/clients/client-profile-header";
 import { Timeline } from "@/components/timeline/timeline";
+import { CheckinHistory } from "@/components/checkin/checkin-history";
+import { CheckinForm } from "@/components/checkin/checkin-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -30,12 +32,14 @@ export default async function ClientProfilePage({ params }: Props) {
       getTimelineForClient(id),
       getMedicationsForClient(id),
       getGoalsForClient(id),
-      getMetricsForClient(id),
+      getMetricsForClient(id, 30),
       getLatestPhase(id),
     ]
   );
 
   const activeMeds = medications.filter((m) => m.active);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayCheckin = metrics.find((m) => m.date === todayStr);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -54,14 +58,36 @@ export default async function ClientProfilePage({ params }: Props) {
         currentPhase={currentPhase}
         goals={goals}
         activeMeds={activeMeds}
-        metrics={metrics}
+        metrics={metrics.slice(0, 7)}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardContent className="p-6">
               <Timeline events={events} clientId={id} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">
+                {todayCheckin ? "Today's Check-in (Submitted)" : "Log Check-in"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CheckinForm clientId={id} existingCheckin={todayCheckin || undefined} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">
+                Check-in History ({metrics.length} entries)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CheckinHistory metrics={metrics} />
             </CardContent>
           </Card>
         </div>
@@ -103,7 +129,7 @@ export default async function ClientProfilePage({ params }: Props) {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">
-                Active Medications & Supplements
+                Active Medications &amp; Supplements
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -134,6 +160,35 @@ export default async function ClientProfilePage({ params }: Props) {
                     </Badge>
                   </div>
                 ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">
+                Weight Log (7 days)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {metrics.slice(0, 7).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No data yet</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {metrics.slice(0, 7).map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-muted-foreground text-xs">
+                        {m.date}
+                      </span>
+                      <span className="font-medium">
+                        {m.weight_kg ? `${m.weight_kg} kg` : "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

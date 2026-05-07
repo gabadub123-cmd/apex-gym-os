@@ -1,7 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getClients, getTimelineForClient, getMetricsForClient } from "@/lib/supabase/queries";
-import { format, startOfWeek, addDays, isWithinInterval } from "date-fns";
+import {
+  getCurrentProfile,
+  getClients,
+  getTimelineForClient,
+  getMetricsForClient,
+} from "@/lib/supabase/queries";
+import { format, startOfWeek, addDays } from "date-fns";
+import { redirect } from "next/navigation";
 
 const eventTypeColors: Record<string, string> = {
   phase_change: "bg-blue-500/20 text-blue-400 border-blue-500/30",
@@ -15,32 +21,37 @@ const eventTypeColors: Record<string, string> = {
 };
 
 export default async function SchedulePage() {
-  const clients = await getClients();
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
+
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  const allEvents = (
-    await Promise.all(clients.map((c) => getTimelineForClient(c.id)))
-  ).flat();
+  let allEvents;
+  let checkinSection = null;
 
-  const clientCheckins = await Promise.all(
-    clients.map(async (client) => {
-      const metrics = await getMetricsForClient(client.id, 1);
-      return {
-        client,
-        lastCheckin: metrics[0]?.date || null,
-      };
-    })
-  );
+  if (profile.role === "client") {
+    allEvents = await getTimelineForClient(profile.id);
+  } else {
+    const clients = await getClients();
+    allEvents = (
+      await Promise.all(clients.map((c) => getTimelineForClient(c.id)))
+    ).flat();
 
-  const checkedInToday = clientCheckins.filter(
-    (c) => c.lastCheckin === format(today, "yyyy-MM-dd")
-  );
+    const clientCheckins = await Promise.all(
+      clients.map(async (client) => {
+        const metrics = await getMetricsForClient(client.id, 1);
+        return { client, lastCheckin: metrics[0]?.date || null };
+      })
+    );
 
-  const missedToday = clientCheckins.filter(
-    (c) => c.lastCheckin !== format(today, "yyyy-MM-dd")
-  );
+    const todayStr = format(today, "yyyy-MM-dd");
+    const checkedIn = clientCheckins.filter((c) => c.lastCheckin === todayStr);
+    const missed = clientCheckins.filter((c) => c.lastCheckin !== todayStr);
+
+    checkinSection = { clients, checkedIn, missed };
+  }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -52,8 +63,8 @@ export default async function SchedulePage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      <div className={`grid grid-cols-1 ${checkinSection ? "lg:grid-cols-3" : ""} gap-6`}>
+        <div className={checkinSection ? "lg:col-span-2" : ""}>
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">
@@ -67,8 +78,7 @@ export default async function SchedulePage() {
                   const dayEvents = allEvents.filter(
                     (e) => e.event_date === dayStr
                   );
-                  const isToday =
-                    format(today, "yyyy-MM-dd") === dayStr;
+                  const isToday = format(today, "yyyy-MM-dd") === dayStr;
 
                   return (
                     <div
@@ -81,36 +91,23 @@ export default async function SchedulePage() {
                         <p className="text-xs text-muted-foreground uppercase">
                           {format(day, "EEE")}
                         </p>
-                        <p
-                          className={`text-lg font-bold ${
-                            isToday ? "text-primary" : ""
-                          }`}
-                        >
+                        <p className={`text-lg font-bold ${isToday ? "text-primary" : ""}`}>
                           {format(day, "d")}
                         </p>
                       </div>
                       <div className="flex-1 space-y-1.5">
                         {dayEvents.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-1">
-                            No events
-                          </p>
+                          <p className="text-xs text-muted-foreground py-1">No events</p>
                         ) : (
                           dayEvents.map((event) => (
-                            <div
-                              key={event.id}
-                              className="flex items-center gap-2"
-                            >
+                            <div key={event.id} className="flex items-center gap-2">
                               <Badge
                                 variant="outline"
-                                className={`text-[10px] ${
-                                  eventTypeColors[event.event_type] || ""
-                                }`}
+                                className={`text-[10px] ${eventTypeColors[event.event_type] || ""}`}
                               >
                                 {event.event_type.replace("_", " ")}
                               </Badge>
-                              <span className="text-sm truncate">
-                                {event.title}
-                              </span>
+                              <span className="text-sm truncate">{event.title}</span>
                             </div>
                           ))
                         )}
@@ -123,60 +120,40 @@ export default async function SchedulePage() {
           </Card>
         </div>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">
-                Today&apos;s Check-ins
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {clients.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No clients</p>
-              ) : (
-                <>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    {checkedInToday.length}/{clients.length} checked in
-                  </p>
-                  {missedToday.map(({ client }) => (
-                    <div
-                      key={client.id}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <div className="h-2 w-2 rounded-full bg-amber-400" />
-                      <span>
-                        {client.first_name} {client.last_name}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] ml-auto text-amber-400 border-amber-500/30"
-                      >
-                        Missing
-                      </Badge>
-                    </div>
-                  ))}
-                  {checkedInToday.map(({ client }) => (
-                    <div
-                      key={client.id}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <div className="h-2 w-2 rounded-full bg-green-400" />
-                      <span>
-                        {client.first_name} {client.last_name}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] ml-auto text-green-400 border-green-500/30"
-                      >
-                        Done
-                      </Badge>
-                    </div>
-                  ))}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {checkinSection && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">
+                  Today&apos;s Check-ins
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-xs text-muted-foreground mb-3">
+                  {checkinSection.checkedIn.length}/{checkinSection.clients.length} checked in
+                </p>
+                {checkinSection.missed.map(({ client }) => (
+                  <div key={client.id} className="flex items-center gap-2 text-sm">
+                    <div className="h-2 w-2 rounded-full bg-amber-400" />
+                    <span>{client.first_name} {client.last_name}</span>
+                    <Badge variant="outline" className="text-[10px] ml-auto text-amber-400 border-amber-500/30">
+                      Missing
+                    </Badge>
+                  </div>
+                ))}
+                {checkinSection.checkedIn.map(({ client }) => (
+                  <div key={client.id} className="flex items-center gap-2 text-sm">
+                    <div className="h-2 w-2 rounded-full bg-green-400" />
+                    <span>{client.first_name} {client.last_name}</span>
+                    <Badge variant="outline" className="text-[10px] ml-auto text-green-400 border-green-500/30">
+                      Done
+                    </Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

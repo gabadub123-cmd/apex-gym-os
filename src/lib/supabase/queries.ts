@@ -141,6 +141,10 @@ export async function getDashboardStats() {
   const profile = await getCurrentProfile();
   if (!profile) return null;
 
+  if (profile.role === "client") {
+    return getClientDashboardStats(profile);
+  }
+
   const clients = await getClients();
   const today = new Date().toISOString().split("T")[0];
 
@@ -166,10 +170,70 @@ export async function getDashboardStats() {
 
   return {
     profile,
+    type: "coach" as const,
     clientCount: clients.length,
     eventsThisWeek: eventsThisWeek || 0,
     activeGoals: activeGoals || 0,
     upcomingEvents: upcomingEvents || [],
     clients,
   };
+}
+
+async function getClientDashboardStats(profile: Profile) {
+  const [metrics, goals, medications, events, phase] = await Promise.all([
+    getMetricsForClient(profile.id, 30),
+    getGoalsForClient(profile.id),
+    getMedicationsForClient(profile.id),
+    getTimelineForClient(profile.id),
+    getLatestPhase(profile.id),
+  ]);
+
+  const today = new Date().toISOString().split("T")[0];
+  const todayCheckin = metrics.find((m) => m.date === today);
+
+  const last7 = metrics.slice(0, 7);
+  const avgWeight =
+    last7.length > 0
+      ? last7.reduce((sum, m) => sum + (m.weight_kg || 0), 0) /
+        last7.filter((m) => m.weight_kg).length
+      : null;
+
+  const latestNutrition = events.find(
+    (e) => e.event_type === "nutrition_change"
+  );
+
+  return {
+    profile,
+    type: "client" as const,
+    phase,
+    metrics,
+    todayCheckin,
+    avgWeight,
+    goals,
+    medications: medications.filter((m) => m.active),
+    events,
+    latestNutrition,
+    upcomingEvents: events.filter((e) => e.event_date >= today),
+  };
+}
+
+export async function getMyCoach(clientId: string): Promise<Profile | null> {
+  const supabase = await createClient();
+  const { data: assignment } = await supabase
+    .from("coach_clients")
+    .select("coach_id")
+    .eq("client_id", clientId)
+    .eq("status", "active")
+    .limit(1)
+    .single();
+
+  if (!assignment) return null;
+
+  const { data: coach } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", assignment.coach_id)
+    .single();
+
+  return coach;
 }

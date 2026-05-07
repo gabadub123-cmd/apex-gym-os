@@ -1,16 +1,34 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trophy } from "lucide-react";
-import { getClients, getTimelineForClient } from "@/lib/supabase/queries";
+import { redirect } from "next/navigation";
+import {
+  getCurrentProfile,
+  getClients,
+  getTimelineForClient,
+} from "@/lib/supabase/queries";
 import { format } from "date-fns";
 import type { TimelineEvent } from "@/lib/types/database";
 
 export default async function TrainingPage() {
-  const clients = await getClients();
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
 
-  const allEvents = (
-    await Promise.all(clients.map((c) => getTimelineForClient(c.id)))
-  ).flat();
+  let allEvents: TimelineEvent[];
+  let clientMap: Record<string, string> = {};
+
+  if (profile.role === "client") {
+    allEvents = await getTimelineForClient(profile.id);
+    clientMap[profile.id] = `${profile.first_name} ${profile.last_name}`;
+  } else {
+    const clients = await getClients();
+    allEvents = (
+      await Promise.all(clients.map((c) => getTimelineForClient(c.id)))
+    ).flat();
+    clientMap = Object.fromEntries(
+      clients.map((c) => [c.id, `${c.first_name} ${c.last_name}`])
+    );
+  }
 
   const milestones = allEvents
     .filter((e) => e.event_type === "milestone")
@@ -18,10 +36,6 @@ export default async function TrainingPage() {
       (a, b) =>
         new Date(b.event_date).getTime() - new Date(a.event_date).getTime()
     );
-
-  const clientMap = Object.fromEntries(
-    clients.map((c) => [c.id, `${c.first_name} ${c.last_name}`])
-  );
 
   const recentMilestones = milestones.slice(0, 10);
 
@@ -43,12 +57,18 @@ export default async function TrainingPage() {
     {}
   );
 
+  const isClient = profile.role === "client";
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Training</h1>
+        <h1 className="text-2xl font-bold">
+          {isClient ? "My Training" : "Training"}
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Client milestones and personal records.
+          {isClient
+            ? "Your milestones and personal records."
+            : "Client milestones and personal records."}
         </p>
       </div>
 
@@ -62,7 +82,9 @@ export default async function TrainingPage() {
           <CardContent>
             {recentMilestones.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No milestones yet. Add milestones from a client&apos;s timeline.
+                {isClient
+                  ? "No milestones yet. Keep pushing!"
+                  : "No milestones yet. Add milestones from a client's timeline."}
               </p>
             ) : (
               <div className="space-y-4">
@@ -76,12 +98,16 @@ export default async function TrainingPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{event.title}</p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-muted-foreground">
-                            {clientMap[event.client_id] || "Unknown"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            &middot;
-                          </span>
+                          {!isClient && (
+                            <>
+                              <span className="text-xs text-muted-foreground">
+                                {clientMap[event.client_id] || "Unknown"}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                &middot;
+                              </span>
+                            </>
+                          )}
                           <span className="text-xs text-muted-foreground">
                             {format(new Date(event.event_date), "MMM d, yyyy")}
                           </span>
@@ -93,15 +119,10 @@ export default async function TrainingPage() {
                               className="text-[10px] text-yellow-400 border-yellow-500/30"
                             >
                               {String(meta.weight_kg)} kg
-                              {meta.reps
-                                ? ` x ${String(meta.reps)}`
-                                : ""}
+                              {meta.reps != null ? ` x ${String(meta.reps)}` : ""}
                             </Badge>
                             {meta.exercise != null && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px]"
-                              >
+                              <Badge variant="outline" className="text-[10px]">
                                 {String(meta.exercise)}
                               </Badge>
                             )}
@@ -140,9 +161,11 @@ export default async function TrainingPage() {
                         <p className="text-sm font-medium">
                           {String(meta.exercise)}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {clientMap[event.client_id] || "Unknown"}
-                        </p>
+                        {!isClient && (
+                          <p className="text-xs text-muted-foreground">
+                            {clientMap[event.client_id] || "Unknown"}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-yellow-400">
