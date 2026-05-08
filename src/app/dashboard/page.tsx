@@ -15,6 +15,7 @@ import { getDashboardStats } from "@/lib/supabase/queries";
 import { format } from "date-fns";
 import Link from "next/link";
 import { CheckinForm } from "@/components/checkin/checkin-form";
+import { AddGoalForm } from "@/components/clients/add-goal-form";
 
 const eventTypeColors: Record<string, string> = {
   phase_change: "text-blue-400",
@@ -283,6 +284,7 @@ function ClientDashboard({
                     </div>
                   ))
               )}
+              <AddGoalForm clientId={stats.profile.id} />
             </CardContent>
           </Card>
 

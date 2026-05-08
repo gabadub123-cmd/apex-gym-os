@@ -20,7 +20,7 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
           supabaseResponse = NextResponse.next({ request });
@@ -36,9 +36,12 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthPage = request.nextUrl.pathname.startsWith("/login");
+  const pathname = request.nextUrl.pathname;
+  const isAuthPage = pathname.startsWith("/login");
+  const isOnboarding = pathname.startsWith("/onboarding");
+  const isAuthCallback = pathname.startsWith("/auth/callback");
 
-  if (!user && !isAuthPage && request.nextUrl.pathname !== "/") {
+  if (!user && !isAuthPage && !isAuthCallback && pathname !== "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -48,6 +51,20 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
+  }
+
+  if (user && !isOnboarding && !isAuthPage && !isAuthCallback && pathname !== "/") {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("onboarding_completed, role")
+      .eq("id", user.id)
+      .single();
+
+    if (profile && !profile.onboarding_completed && profile.role === "client") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

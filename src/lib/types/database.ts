@@ -25,6 +25,7 @@ export interface Profile {
   date_of_birth: string | null;
   gender: string | null;
   bio: string | null;
+  onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
 }

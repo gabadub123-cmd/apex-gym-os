@@ -7,6 +7,7 @@ import {
   Settings,
   ShoppingBag,
   MessageSquare,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/lib/types/database";
@@ -48,6 +49,12 @@ export const navItems: NavItem[] = [
     href: "/dashboard/nutrition",
     icon: UtensilsCrossed,
     roles: ["admin", "coach", "client"],
+  },
+  {
+    label: "Admin",
+    href: "/dashboard/admin",
+    icon: ShieldCheck,
+    roles: ["admin"],
   },
   {
     label: "Shop",

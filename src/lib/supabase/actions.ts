@@ -170,6 +170,46 @@ export async function addGoal(formData: FormData) {
   revalidatePath(`/dashboard/clients/${clientId}`);
 }
 
+export async function completeOnboarding(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const updates: Record<string, unknown> = {
+    onboarding_completed: true,
+  };
+
+  const phone = formData.get("phone") as string;
+  if (phone) updates.phone = phone;
+  const dob = formData.get("date_of_birth") as string;
+  if (dob) updates.date_of_birth = dob;
+  const gender = formData.get("gender") as string;
+  if (gender) updates.gender = gender;
+  const bio = formData.get("bio") as string;
+  if (bio) updates.bio = bio;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  const goalTitle = formData.get("goal_title") as string;
+  if (goalTitle) {
+    await supabase.from("client_goals").insert({
+      client_id: user.id,
+      title: goalTitle,
+      target_value: (formData.get("goal_target") as string) || null,
+      created_by: user.id,
+    });
+  }
+
+  revalidatePath("/dashboard");
+}
+
 export async function updateProfile(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -191,4 +231,66 @@ export async function updateProfile(formData: FormData) {
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
+}
+
+export async function assignClientToCoach(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const coachId = formData.get("coach_id") as string;
+  const clientId = formData.get("client_id") as string;
+
+  const { error } = await supabase.from("coach_clients").upsert(
+    {
+      coach_id: coachId,
+      client_id: clientId,
+      status: "active",
+    },
+    { onConflict: "coach_id,client_id" }
+  );
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/admin");
+}
+
+export async function removeClientFromCoach(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const coachId = formData.get("coach_id") as string;
+  const clientId = formData.get("client_id") as string;
+
+  const { error } = await supabase
+    .from("coach_clients")
+    .delete()
+    .eq("coach_id", coachId)
+    .eq("client_id", clientId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/admin");
+}
+
+export async function updateUserRole(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const userId = formData.get("user_id") as string;
+  const role = formData.get("role") as string;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ role })
+    .eq("id", userId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/admin");
 }

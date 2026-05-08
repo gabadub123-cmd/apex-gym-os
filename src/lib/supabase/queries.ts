@@ -217,6 +217,36 @@ async function getClientDashboardStats(profile: Profile) {
   };
 }
 
+export async function getAllProfiles(): Promise<Profile[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .order("role")
+    .order("first_name");
+  return data || [];
+}
+
+export async function getCoaches(): Promise<Profile[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("role", "coach")
+    .order("first_name");
+  return data || [];
+}
+
+export async function getCoachAssignments(): Promise<
+  { coach_id: string; client_id: string; status: string }[]
+> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("coach_clients")
+    .select("coach_id, client_id, status");
+  return data || [];
+}
+
 export async function getMyCoach(clientId: string): Promise<Profile | null> {
   const supabase = await createClient();
   const { data: assignment } = await supabase
