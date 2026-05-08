@@ -147,3 +147,74 @@ export interface SupplementChangeMetadata {
   dosage: string;
   frequency: string;
 }
+
+// ─── Training Engine ───
+
+export type ExerciseCategory =
+  | "chest"
+  | "back"
+  | "shoulders"
+  | "legs"
+  | "arms"
+  | "core"
+  | "cardio"
+  | "compound"
+  | "other";
+
+export interface Exercise {
+  id: string;
+  name: string;
+  category: ExerciseCategory;
+  video_url: string | null;
+  instructions: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface WorkoutTemplate {
+  id: string;
+  coach_id: string;
+  client_id: string;
+  name: string;
+  day_label: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkoutTemplateExercise {
+  id: string;
+  template_id: string;
+  exercise_id: string;
+  order_index: number;
+  sets: number;
+  reps: string;
+  weight_kg: number | null;
+  tempo: string | null;
+  rest_seconds: number | null;
+  notes: string | null;
+  exercise?: Exercise;
+}
+
+export interface WorkoutLog {
+  id: string;
+  client_id: string;
+  template_id: string | null;
+  name: string;
+  date: string;
+  duration_minutes: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface WorkoutLogSet {
+  id: string;
+  log_id: string;
+  exercise_id: string;
+  set_number: number;
+  reps: number | null;
+  weight_kg: number | null;
+  rpe: number | null;
+  notes: string | null;
+  exercise?: Exercise;
+}

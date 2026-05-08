@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { TimelineEventType, MedicationType } from "@/lib/types/database";
+import type {
+  TimelineEventType,
+  MedicationType,
+  ExerciseCategory,
+} from "@/lib/types/database";
 
 export async function addTimelineEvent(formData: FormData) {
   const supabase = await createClient();
@@ -293,4 +297,143 @@ export async function updateUserRole(formData: FormData) {
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard/admin");
+}
+
+// ─── Training Engine Actions ───
+
+export async function addExercise(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase.from("exercises").insert({
+    name: formData.get("name") as string,
+    category: formData.get("category") as ExerciseCategory,
+    video_url: (formData.get("video_url") as string) || null,
+    instructions: (formData.get("instructions") as string) || null,
+    created_by: user.id,
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/training");
+}
+
+export async function createWorkoutTemplate(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const clientId = formData.get("client_id") as string;
+
+  const { data, error } = await supabase
+    .from("workout_templates")
+    .insert({
+      coach_id: user.id,
+      client_id: clientId,
+      name: formData.get("name") as string,
+      day_label: (formData.get("day_label") as string) || null,
+      notes: (formData.get("notes") as string) || null,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  const exercisesJson = formData.get("exercises") as string;
+  if (exercisesJson) {
+    const exercises = JSON.parse(exercisesJson) as {
+      exercise_id: string;
+      sets: number;
+      reps: string;
+      weight_kg?: number;
+      tempo?: string;
+      rest_seconds?: number;
+      notes?: string;
+    }[];
+
+    if (exercises.length > 0) {
+      const rows = exercises.map((ex, i) => ({
+        template_id: data.id,
+        exercise_id: ex.exercise_id,
+        order_index: i,
+        sets: ex.sets,
+        reps: ex.reps,
+        weight_kg: ex.weight_kg || null,
+        tempo: ex.tempo || null,
+        rest_seconds: ex.rest_seconds || null,
+        notes: ex.notes || null,
+      }));
+
+      const { error: exError } = await supabase
+        .from("workout_template_exercises")
+        .insert(rows);
+      if (exError) throw new Error(exError.message);
+    }
+  }
+
+  revalidatePath(`/dashboard/clients/${clientId}`);
+  revalidatePath("/dashboard/training");
+}
+
+export async function logWorkout(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const clientId = formData.get("client_id") as string;
+
+  const { data, error } = await supabase
+    .from("workout_logs")
+    .insert({
+      client_id: clientId,
+      template_id: (formData.get("template_id") as string) || null,
+      name: formData.get("name") as string,
+      date: formData.get("date") as string,
+      duration_minutes: formData.get("duration_minutes")
+        ? Number(formData.get("duration_minutes"))
+        : null,
+      notes: (formData.get("notes") as string) || null,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  const setsJson = formData.get("sets") as string;
+  if (setsJson) {
+    const sets = JSON.parse(setsJson) as {
+      exercise_id: string;
+      set_number: number;
+      reps?: number;
+      weight_kg?: number;
+      rpe?: number;
+      notes?: string;
+    }[];
+
+    if (sets.length > 0) {
+      const rows = sets.map((s) => ({
+        log_id: data.id,
+        exercise_id: s.exercise_id,
+        set_number: s.set_number,
+        reps: s.reps ?? null,
+        weight_kg: s.weight_kg ?? null,
+        rpe: s.rpe ?? null,
+        notes: s.notes || null,
+      }));
+
+      const { error: setError } = await supabase
+        .from("workout_log_sets")
+        .insert(rows);
+      if (setError) throw new Error(setError.message);
+    }
+  }
+
+  revalidatePath("/dashboard/training");
+  revalidatePath(`/dashboard/clients/${clientId}`);
 }

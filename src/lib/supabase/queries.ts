@@ -7,6 +7,11 @@ import type {
   Medication,
   ClientGoal,
   ClientMetric,
+  Exercise,
+  WorkoutTemplate,
+  WorkoutTemplateExercise,
+  WorkoutLog,
+  WorkoutLogSet,
 } from "@/lib/types/database";
 
 export async function getCurrentProfile(): Promise<Profile | null> {
@@ -244,6 +249,68 @@ export async function getCoachAssignments(): Promise<
   const { data } = await supabase
     .from("coach_clients")
     .select("coach_id, client_id, status");
+  return data || [];
+}
+
+// ─── Training Engine Queries ───
+
+export async function getExercises(): Promise<Exercise[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("exercises")
+    .select("*")
+    .order("category")
+    .order("name");
+  return data || [];
+}
+
+export async function getWorkoutTemplatesForClient(
+  clientId: string
+): Promise<WorkoutTemplate[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("workout_templates")
+    .select("*")
+    .eq("client_id", clientId)
+    .order("created_at", { ascending: false });
+  return data || [];
+}
+
+export async function getTemplateExercises(
+  templateId: string
+): Promise<WorkoutTemplateExercise[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("workout_template_exercises")
+    .select("*, exercise:exercises(*)")
+    .eq("template_id", templateId)
+    .order("order_index");
+  return data || [];
+}
+
+export async function getWorkoutLogsForClient(
+  clientId: string,
+  limit = 20
+): Promise<WorkoutLog[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("workout_logs")
+    .select("*")
+    .eq("client_id", clientId)
+    .order("date", { ascending: false })
+    .limit(limit);
+  return data || [];
+}
+
+export async function getWorkoutLogSets(
+  logId: string
+): Promise<WorkoutLogSet[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("workout_log_sets")
+    .select("*, exercise:exercises(*)")
+    .eq("log_id", logId)
+    .order("set_number");
   return data || [];
 }
 
