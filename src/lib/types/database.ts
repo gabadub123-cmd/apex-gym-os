@@ -218,3 +218,28 @@ export interface WorkoutLogSet {
   notes: string | null;
   exercise?: Exercise;
 }
+
+// ─── Nutrition Logger ───
+
+export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
+
+export interface FoodLog {
+  id: string;
+  client_id: string;
+  date: string;
+  meal: MealType;
+  food_name: string;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  calories: number | null;
+  created_at: string;
+}
+
+export interface WaterLog {
+  id: string;
+  client_id: string;
+  date: string;
+  amount_ml: number;
+  created_at: string;
+}

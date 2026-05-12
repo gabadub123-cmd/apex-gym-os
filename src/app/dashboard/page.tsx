@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { CheckinForm } from "@/components/checkin/checkin-form";
 import { AddGoalForm } from "@/components/clients/add-goal-form";
+import { GoalCard } from "@/components/clients/goal-card";
 
 const eventTypeColors: Record<string, string> = {
   phase_change: "text-blue-400",
@@ -264,25 +265,29 @@ function ClientDashboard({
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">My Goals</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               {stats.goals.filter((g) => !g.completed).length === 0 ? (
                 <p className="text-sm text-muted-foreground">No active goals</p>
               ) : (
                 stats.goals
                   .filter((g) => !g.completed)
                   .map((goal) => (
-                    <div key={goal.id} className="space-y-1">
-                      <p className="text-sm font-medium">{goal.title}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{goal.current_value}</span>
-                        <span>&rarr;</span>
-                        <span className="font-medium text-foreground">{goal.target_value}</span>
-                      </div>
-                      {goal.target_date && (
-                        <p className="text-xs text-muted-foreground">Target: {goal.target_date}</p>
-                      )}
-                    </div>
+                    <GoalCard key={goal.id} goal={goal} />
                   ))
+              )}
+              {stats.goals.filter((g) => g.completed).length > 0 && (
+                <details className="pt-1">
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                    Completed ({stats.goals.filter((g) => g.completed).length})
+                  </summary>
+                  <div className="space-y-2 mt-2">
+                    {stats.goals
+                      .filter((g) => g.completed)
+                      .map((goal) => (
+                        <GoalCard key={goal.id} goal={goal} />
+                      ))}
+                  </div>
+                </details>
               )}
               <AddGoalForm clientId={stats.profile.id} />
             </CardContent>

@@ -6,6 +6,7 @@ import type {
   TimelineEventType,
   MedicationType,
   ExerciseCategory,
+  MealType,
 } from "@/lib/types/database";
 
 export async function addTimelineEvent(formData: FormData) {
@@ -436,4 +437,112 @@ export async function logWorkout(formData: FormData) {
 
   revalidatePath("/dashboard/training");
   revalidatePath(`/dashboard/clients/${clientId}`);
+}
+
+// ─── Nutrition Logger Actions ───
+
+export async function addFoodLog(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const clientId = formData.get("client_id") as string;
+
+  const { error } = await supabase.from("food_logs").insert({
+    client_id: clientId,
+    date: formData.get("date") as string,
+    meal: formData.get("meal") as MealType,
+    food_name: formData.get("food_name") as string,
+    protein_g: formData.get("protein_g")
+      ? Number(formData.get("protein_g"))
+      : null,
+    carbs_g: formData.get("carbs_g")
+      ? Number(formData.get("carbs_g"))
+      : null,
+    fat_g: formData.get("fat_g") ? Number(formData.get("fat_g")) : null,
+    calories: formData.get("calories")
+      ? Number(formData.get("calories"))
+      : null,
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/nutrition");
+}
+
+export async function deleteFoodLog(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const id = formData.get("id") as string;
+
+  const { error } = await supabase.from("food_logs").delete().eq("id", id);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/nutrition");
+}
+
+export async function addWater(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const clientId = formData.get("client_id") as string;
+  const date = formData.get("date") as string;
+  const amount = Number(formData.get("amount_ml"));
+
+  const { error } = await supabase.from("water_logs").insert({
+    client_id: clientId,
+    date,
+    amount_ml: amount,
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/nutrition");
+}
+
+// ─── Goal Actions ───
+
+export async function toggleGoalComplete(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const goalId = formData.get("goal_id") as string;
+  const completed = formData.get("completed") === "true";
+
+  const { error } = await supabase
+    .from("client_goals")
+    .update({ completed })
+    .eq("id", goalId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+}
+
+export async function updateGoalProgress(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const goalId = formData.get("goal_id") as string;
+  const currentValue = formData.get("current_value") as string;
+
+  const { error } = await supabase
+    .from("client_goals")
+    .update({ current_value: currentValue })
+    .eq("id", goalId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
 }

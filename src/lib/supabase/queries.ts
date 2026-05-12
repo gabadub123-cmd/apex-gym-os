@@ -10,6 +10,8 @@ import type {
   Exercise,
   WorkoutTemplate,
   WorkoutTemplateExercise,
+  FoodLog,
+  WaterLog,
   WorkoutLog,
   WorkoutLogSet,
 } from "@/lib/types/database";
@@ -312,6 +314,66 @@ export async function getWorkoutLogSets(
     .eq("log_id", logId)
     .order("set_number");
   return data || [];
+}
+
+// ─── Nutrition Logger Queries ───
+
+export async function getFoodLogsForDate(
+  clientId: string,
+  date: string
+): Promise<FoodLog[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("food_logs")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("date", date)
+    .order("created_at");
+  return data || [];
+}
+
+export async function getFoodLogHistory(
+  clientId: string,
+  limit = 7
+): Promise<{ date: string; protein: number; carbs: number; fat: number; calories: number }[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("food_logs")
+    .select("date, protein_g, carbs_g, fat_g, calories")
+    .eq("client_id", clientId)
+    .order("date", { ascending: false })
+    .limit(100);
+
+  if (!data || data.length === 0) return [];
+
+  const byDate: Record<string, { protein: number; carbs: number; fat: number; calories: number }> = {};
+  for (const row of data) {
+    if (!byDate[row.date]) byDate[row.date] = { protein: 0, carbs: 0, fat: 0, calories: 0 };
+    byDate[row.date].protein += row.protein_g || 0;
+    byDate[row.date].carbs += row.carbs_g || 0;
+    byDate[row.date].fat += row.fat_g || 0;
+    byDate[row.date].calories += row.calories || 0;
+  }
+
+  return Object.entries(byDate)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, limit)
+    .map(([date, totals]) => ({ date, ...totals }));
+}
+
+export async function getWaterForDate(
+  clientId: string,
+  date: string
+): Promise<number> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("water_logs")
+    .select("amount_ml")
+    .eq("client_id", clientId)
+    .eq("date", date);
+
+  if (!data || data.length === 0) return 0;
+  return data.reduce((sum, r) => sum + r.amount_ml, 0);
 }
 
 export async function getMyCoach(clientId: string): Promise<Profile | null> {
