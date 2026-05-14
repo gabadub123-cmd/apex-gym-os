@@ -7,6 +7,7 @@ import type {
   MedicationType,
   ExerciseCategory,
   MealType,
+  ScheduleStatus,
 } from "@/lib/types/database";
 
 export async function addTimelineEvent(formData: FormData) {
@@ -291,6 +292,11 @@ export async function updateUserRole(formData: FormData) {
   const userId = formData.get("user_id") as string;
   const role = formData.get("role") as string;
 
+  // Prevent admin from demoting themselves
+  if (userId === user.id) {
+    throw new Error("Cannot change your own role");
+  }
+
   const { error } = await supabase
     .from("profiles")
     .update({ role })
@@ -545,4 +551,82 @@ export async function updateGoalProgress(formData: FormData) {
 
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard");
+}
+
+// ─── Schedule Actions ───
+
+export async function createScheduledEvent(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  // Get current user's profile to determine role
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const clientId = formData.get("client_id") as string;
+  const isCoachOrAdmin =
+    profile?.role === "admin" || profile?.role === "coach";
+
+  const { error } = await supabase.from("scheduled_events").insert({
+    client_id: clientId,
+    coach_id: isCoachOrAdmin ? user.id : null,
+    title: formData.get("title") as string,
+    description: (formData.get("description") as string) || null,
+    event_date: formData.get("event_date") as string,
+    start_time: (formData.get("start_time") as string) || null,
+    end_time: (formData.get("end_time") as string) || null,
+    // Coach/admin events are auto-approved; client events need review
+    status: isCoachOrAdmin ? "approved" : "pending",
+    created_by: user.id,
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/schedule");
+}
+
+export async function reviewScheduledEvent(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const eventId = formData.get("event_id") as string;
+  const status = formData.get("status") as ScheduleStatus;
+
+  const { error } = await supabase
+    .from("scheduled_events")
+    .update({
+      status,
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", eventId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/schedule");
+}
+
+export async function deleteScheduledEvent(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const eventId = formData.get("event_id") as string;
+
+  const { error } = await supabase
+    .from("scheduled_events")
+    .delete()
+    .eq("id", eventId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/schedule");
 }

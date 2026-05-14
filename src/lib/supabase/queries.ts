@@ -14,6 +14,7 @@ import type {
   WaterLog,
   WorkoutLog,
   WorkoutLogSet,
+  ScheduledEvent,
 } from "@/lib/types/database";
 
 export async function getCurrentProfile(): Promise<Profile | null> {
@@ -374,6 +375,77 @@ export async function getWaterForDate(
 
   if (!data || data.length === 0) return 0;
   return data.reduce((sum, r) => sum + r.amount_ml, 0);
+}
+
+// ─── Schedule Queries ───
+
+export async function getScheduledEventsForWeek(
+  startDate: string,
+  endDate: string,
+  clientId?: string
+): Promise<ScheduledEvent[]> {
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!profile) return [];
+
+  let query = supabase
+    .from("scheduled_events")
+    .select("*")
+    .gte("event_date", startDate)
+    .lte("event_date", endDate)
+    .order("event_date")
+    .order("start_time");
+
+  if (profile.role === "client") {
+    query = query.eq("client_id", profile.id);
+  } else if (clientId) {
+    query = query.eq("client_id", clientId);
+  }
+
+  const { data } = await query;
+  return data || [];
+}
+
+export async function getScheduledEventsForClient(
+  clientId: string,
+  limit = 20
+): Promise<ScheduledEvent[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("scheduled_events")
+    .select("*")
+    .eq("client_id", clientId)
+    .order("event_date", { ascending: false })
+    .limit(limit);
+  return data || [];
+}
+
+export async function getPendingScheduleReviews(): Promise<ScheduledEvent[]> {
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!profile) return [];
+
+  let query = supabase
+    .from("scheduled_events")
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (profile.role === "coach") {
+    // Only show pending events for the coach's clients
+    const { data: assignments } = await supabase
+      .from("coach_clients")
+      .select("client_id")
+      .eq("coach_id", profile.id)
+      .eq("status", "active");
+
+    if (!assignments || assignments.length === 0) return [];
+    const clientIds = assignments.map((a) => a.client_id);
+    query = query.in("client_id", clientIds);
+  }
+
+  const { data } = await query;
+  return data || [];
 }
 
 export async function getMyCoach(clientId: string): Promise<Profile | null> {

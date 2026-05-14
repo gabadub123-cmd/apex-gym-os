@@ -243,3 +243,27 @@ export interface WaterLog {
   amount_ml: number;
   created_at: string;
 }
+
+// ─── Schedule System ───
+
+export type ScheduleStatus = "pending" | "approved" | "declined" | "completed";
+
+export interface ScheduledEvent {
+  id: string;
+  client_id: string;
+  coach_id: string | null;
+  title: string;
+  description: string | null;
+  event_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  status: ScheduleStatus;
+  created_by: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined fields
+  client?: Profile;
+  creator?: Profile;
+}
